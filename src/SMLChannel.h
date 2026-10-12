@@ -2,6 +2,8 @@
 #include "OpenKNX.h"
 #include "sml/sml_list.h"
 #include "sml/sml_value.h"
+#include "ObisAsciiParser.h"
+#include "SMLHelpers.h"
 #if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
 #include "OpenKNX/Format/JSON/Writer.h"
 #endif
@@ -19,6 +21,8 @@
     #define OPENKNX_SML_BUFFER 1024
 #endif
 
+// Wird nicht mehr ausgewertet: der Empfangs-Timeout ist pro Kanal in der ETS einstellbar
+// (ParamSML_cReceiveTimeout). Das Define bleibt nur, damit bestehende Projekte weiter bauen.
 #ifndef OPENKNX_SML_STALE_TIMEOUT
     #define OPENKNX_SML_STALE_TIMEOUT 5000
 #endif
@@ -30,8 +34,8 @@ class SMLChannel : public OpenKNX::Channel
 {
 
   protected:
-    // Schützt die Übergabe von _smlBuffer zwischen writeBuffer() und processFile(),
-    // die im Dualcore-Betrieb auf unterschiedlichen Kernen laufen.
+    // Schützt die Übergabe von _smlBuffer bzw. _asciiTelegram zwischen writeBuffer() und
+    // processFile(), die im Dualcore-Betrieb auf unterschiedlichen Kernen laufen.
 #ifdef ARDUINO_ARCH_RP2040
     mutex_t _mutex;
 #elif defined(ARDUINO_ARCH_ESP32)
@@ -43,6 +47,17 @@ class SMLChannel : public OpenKNX::Channel
     // uint16_t _currentFileSize = 0;
     HardwareSerial *_serial = nullptr;
     sml_buffer *_smlBuffer = NULL;
+
+    // OBIS-ASCII: Der Parser rahmt Telegramme direkt in _buffer (im ASCII-Betrieb ungenutzt
+    // für SML, daher kein zusätzlicher RAM). Ein fertiges Telegramm wird als Kopie per
+    // Mutex an processFile() übergeben, genau wie _smlBuffer.
+    ObisAsciiParser _asciiParser;
+    char *_asciiTelegram = nullptr;
+    uint16_t _asciiTelegramLen = 0;
+
+    bool _serialOpen = false;       // Schnittstelle wurde in setSerial() geöffnet
+    bool _noSerialLogged = false;   // Warnung "keine Schnittstelle" nur einmal
+    bool _asciiHintLogged = false;  // ASCII-Hinweis im SML-Betrieb nur einmal pro Start
 
     int64_t _sentCounterIn = 0;
     int64_t _sentCounterInT1 = 0;
@@ -124,6 +139,14 @@ class SMLChannel : public OpenKNX::Channel
     bool tryLockBuffer();
     void unlockBuffer();
     void processFile();
+    void processFileAscii();
+    void writeBufferSml(uint8_t byte);
+    void writeBufferAscii(uint8_t byte);
+    bool isAscii();
+    void publishIdentifier(const char *obis, const char *identifier);
+
+    static void asciiLineTrampoline(void *ctx, const char *line, size_t len, ObisAscii::LineKind kind, const ObisAscii::Entry *entry);
+    void processAsciiLine(const char *line, size_t len, ObisAscii::LineKind kind, const ObisAscii::Entry *entry);
 
     void processDataPoint(sml_list_entry *entry);
     void processDataPoint(char *obis, const uint8_t &a, const uint8_t &b, const uint8_t &c, const uint8_t &d, const uint8_t &e, const uint8_t &f, boolean value, const char *statusSuffix);
@@ -157,7 +180,10 @@ class SMLChannel : public OpenKNX::Channel
     const std::string name() override;
     void writeBuffer(uint8_t byte);
     bool isActive();
-    // true, solange innerhalb von OPENKNX_SML_STALE_TIMEOUT ein Telegramm ankam
+    // true, solange innerhalb des Empfangs-Timeouts (ETS) ein gültiges Telegramm ankam
     bool receiveStatus();
+    // Kurzer Status für das Diagnose-KO (DPT 16, maximal 14 Zeichen)
     const std::string diagnoseInfo();
+    // Protokoll, Baudrate und Datenformat, z. B. "ASCII 9600 7E1"; leer, wenn der Kanal inaktiv ist
+    const std::string serialInfo();
 };

@@ -44,6 +44,7 @@ const uint8_t SML_START[8] = {0x1B, 0x1B, 0x1B, 0x1B, 0x01, 0x01, 0x01, 0x01};
 const uint8_t SML_ESCAPE_END = 0x1A;
 
 SMLChannel::SMLChannel(uint8_t index)
+    : _asciiParser((char *)_buffer, OPENKNX_SML_BUFFER)
 {
     _channelIndex = index;
 }
@@ -53,10 +54,34 @@ HardwareSerial *SMLChannel::getSerial()
     return _serial;
 }
 
+bool SMLChannel::isAscii()
+{
+    return ParamSML_cProtocol == 1;
+}
+
+// Wird von main.cpp nach openknx.setup() aufgerufen, die Parameter sind hier also gültig.
+// Ein inaktiver Kanal öffnet seine Schnittstelle nicht.
 void SMLChannel::setSerial(HardwareSerial *serial)
 {
     _serial = serial;
-    getSerial()->begin(9600);
+
+    if (_serial == nullptr) return;
+
+    if (!isActive())
+    {
+        logDebugP("Kanal inaktiv, serielle Schnittstelle bleibt geschlossen");
+        return;
+    }
+
+    const uint32_t baud = SMLHelpers::baudFromParam(ParamSML_cBaudrate);
+    const SMLHelpers::SerialFormat fmt = SMLHelpers::formatFromParams(ParamSML_cProtocol, ParamSML_cDataFormat);
+
+    getSerial()->begin(baud, fmt == SMLHelpers::SerialFormat::F7E1 ? SERIAL_7E1 : SERIAL_8N1);
+    _serialOpen = true;
+
+    char info[24] = {};
+    SMLHelpers::formatSerialInfo(info, sizeof(info), ParamSML_cProtocol, baud, fmt);
+    logInfoP("Serielle Schnittstelle geöffnet: %s", info);
 }
 
 const std::string SMLChannel::name()
@@ -98,6 +123,20 @@ const std::string SMLChannel::diagnoseInfo()
     return std::string(buffer);
 }
 
+// Protokoll, Baudrate und Datenformat für die Konsole. Das Diagnose-KO ist ein DPT 16
+// mit nur 14 Zeichen, deshalb steht das hier getrennt von diagnoseInfo().
+const std::string SMLChannel::serialInfo()
+{
+    if (!isActive())
+        return "";
+
+    char buffer[24] = {};
+    SMLHelpers::formatSerialInfo(buffer, sizeof(buffer), ParamSML_cProtocol,
+                                 SMLHelpers::baudFromParam(ParamSML_cBaudrate),
+                                 SMLHelpers::formatFromParams(ParamSML_cProtocol, ParamSML_cDataFormat));
+    return std::string(buffer);
+}
+
 void SMLChannel::setup(bool configured)
 {
 #ifdef ARDUINO_ARCH_RP2040
@@ -112,12 +151,21 @@ void SMLChannel::setup(bool configured)
 
 void SMLChannel::loop(bool configured)
 {
-    if (getSerial() == nullptr) return;
+    // Kein frühes return: auch ein Kanal ohne Schnittstelle muss seinen Status auswerten,
+    // damit "Zähler empfängt" nach dem Start einmalig 0 meldet.
+    if (!_noSerialLogged && _serial == nullptr && isActive())
+    {
+        logWarningP("Kanal aktiv, aber keine serielle Schnittstelle vorhanden");
+        _noSerialLogged = true;
+    }
 
 #if !defined(OPENKNX_DUALCORE)
-    while (getSerial()->available())
+    if (_serialOpen)
     {
-        writeBuffer(getSerial()->read());
+        while (getSerial()->available())
+        {
+            writeBuffer(getSerial()->read());
+        }
     }
 #endif
 
@@ -128,16 +176,18 @@ void SMLChannel::loop(bool configured)
 
 void SMLChannel::loopStatus()
 {
-    if (!_lastReceivedStatus && _lastReceivedFile != 0 && !delayCheck(_lastReceivedFile, OPENKNX_SML_STALE_TIMEOUT))
+    const bool receiving = SMLHelpers::isReceiving(millis(), _lastReceivedFile, SMLHelpers::timeoutMsFromParam(ParamSML_cReceiveTimeout));
+
+    if (receiving != _lastReceivedStatus)
     {
-        _lastReceivedStatus = true;
-        if (_led != nullptr) openknxSMLModule.ledHelper(_led, true, _lastReceivedByte);
+        _lastReceivedStatus = receiving;
+        if (_led != nullptr) openknxSMLModule.ledHelper(_led, receiving, _lastReceivedByte);
     }
-    else if (_lastReceivedStatus && delayCheck(_lastReceivedFile, OPENKNX_SML_STALE_TIMEOUT))
-    {
-        _lastReceivedStatus = false;
-        if (_led != nullptr) openknxSMLModule.ledHelper(_led, false, _lastReceivedByte);
-    }
+
+    // Bei jedem Durchlauf: valueCompare() sendet nur bei Änderung, beim ersten Aufruf (KO noch
+    // nicht initialisiert) aber immer. So meldet auch ein Kanal ohne Daten einmalig 0.
+    if (isActive() && knx.configured() && openknx.afterStartupDelay())
+        KoSML_cReceiving.valueCompare(_lastReceivedStatus, DPT_Bool);
 }
 
 #if defined(OPENKNX_DUALCORE)
@@ -147,7 +197,7 @@ void SMLChannel::setup1(bool configured)
 
 void SMLChannel::loop1(bool configured)
 {
-    if (getSerial() == nullptr) return;
+    if (!_serialOpen) return;
 
     while (getSerial()->available())
     {
@@ -165,6 +215,14 @@ void SMLChannel::writeBuffer(uint8_t byte)
     _lastReceivedByte = millis();
     openknxSMLModule._lastReceivedByte = millis();
 
+    if (isAscii())
+        writeBufferAscii(byte);
+    else
+        writeBufferSml(byte);
+}
+
+void SMLChannel::writeBufferSml(uint8_t byte)
+{
     // Kein Telegrammende innerhalb des Puffers gefunden, der Inhalt ist damit unbrauchbar
     // und wird komplett verworfen. Anschließend wird wieder auf eine Startsequenz gewartet.
     // Eine vollständige Startsequenz kann nicht verloren gehen, die hätte unten bereits
@@ -310,10 +368,68 @@ void SMLChannel::writeBuffer(uint8_t byte)
                 {
                     logErrorP("Unexpected chars");
                 }
+                // Unabhängig vom Debug-Modus und nur einmal pro Start: der Kanal ist
+                // vermutlich auf SML eingestellt, der Zähler sendet aber OBIS-ASCII.
+                if (!_asciiHintLogged && SMLHelpers::looksLikeObisAscii(_buffer, _bufferPos))
+                {
+                    logWarningP("Sieht nach OBIS-ASCII aus, Protokoll in der ETS umstellen");
+                    _asciiHintLogged = true;
+                }
                 moveBuffer(1);
             }
         }
     }
+}
+
+void SMLChannel::writeBufferAscii(uint8_t byte)
+{
+    const ObisAsciiParser::Result result = _asciiParser.feed(byte);
+    if (result == ObisAsciiParser::Result::None) return;
+
+    if (result == ObisAsciiParser::Result::Dropped)
+    {
+        switch (_asciiParser.lastDropReason())
+        {
+            case ObisAsciiParser::DropReason::Overflow:
+                logErrorP("No end of OBIS-ASCII telegram within %u bytes, telegram dropped", OPENKNX_SML_BUFFER);
+                break;
+            case ObisAsciiParser::DropReason::Resync:
+                if (openknxSMLModule.debug()) logWarningP("OBIS-ASCII telegram dropped (new telegram started)");
+                break;
+            case ObisAsciiParser::DropReason::BccMismatch:
+                if (openknxSMLModule.debug()) logWarningP("OBIS-ASCII telegram dropped (BCC mismatch)");
+                break;
+            case ObisAsciiParser::DropReason::Framing:
+                if (openknxSMLModule.debug()) logWarningP("OBIS-ASCII telegram dropped (framing error)");
+                break;
+            default:
+                break;
+        }
+        return;
+    }
+
+    // Complete: Kopie an processFile() übergeben, _buffer gehört gleich wieder dem Parser
+    const size_t length = _asciiParser.length();
+
+    lockBuffer();
+    if (_asciiTelegram != nullptr)
+    {
+        // vorheriges, noch nicht verarbeitetes Telegramm verwerfen
+        free(_asciiTelegram);
+        _asciiTelegram = nullptr;
+        _asciiTelegramLen = 0;
+    }
+    _asciiTelegram = (char *)malloc(length);
+    if (_asciiTelegram != nullptr)
+    {
+        memcpy(_asciiTelegram, _asciiParser.data(), length);
+        _asciiTelegramLen = (uint16_t)length;
+    }
+    else
+    {
+        logErrorP("OBIS-ASCII telegram dropped (out of memory)");
+    }
+    unlockBuffer();
 }
 
 // Beginnt die Aufzeichnung mit der Startsequenz an Position 0. Damit liegt der Rahmen
@@ -400,6 +516,12 @@ void SMLChannel::unlockBuffer()
 
 void SMLChannel::processFile()
 {
+    if (_asciiTelegram != nullptr)
+    {
+        processFileAscii();
+        return;
+    }
+
     if (_smlBuffer == NULL) return;
 
     if (!tryLockBuffer()) return;
@@ -491,6 +613,94 @@ void SMLChannel::processFile()
     // clearCurrentFile();
 
     return;
+}
+
+void SMLChannel::processFileAscii()
+{
+    if (!tryLockBuffer()) return;
+
+    char *telegram = _asciiTelegram;
+    const uint16_t length = _asciiTelegramLen;
+    _asciiTelegram = nullptr;
+    _asciiTelegramLen = 0;
+
+    unlockBuffer();
+
+    if (telegram == nullptr) return;
+
+    if (openknxSMLModule.debug())
+    {
+        logInfoP("Valid OBIS-ASCII telegram (%u bytes)", length);
+        logIndentUp();
+    }
+
+    _lastReceivedFile = millis();
+    _features = {};
+    _statusSentThisFile = false;
+#if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
+    mqttBegin();
+#endif
+
+    const ObisAscii::Summary summary = ObisAscii::parseTelegram(telegram, length, &SMLChannel::asciiLineTrampoline, this);
+
+    if (openknxSMLModule.debug())
+    {
+        logInfoP("Ident: %s", summary.ident);
+        logInfoP("%u Zeilen, %u Werte, %u verworfen", summary.lines, summary.entries, summary.dropped);
+        logIndentDown();
+    }
+
+    free(telegram);
+
+#if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
+    mqttPublish();
+#endif
+}
+
+void SMLChannel::asciiLineTrampoline(void *ctx, const char *line, size_t len, ObisAscii::LineKind kind, const ObisAscii::Entry *entry)
+{
+    static_cast<SMLChannel *>(ctx)->processAsciiLine(line, len, kind, entry);
+}
+
+// Ordnet eine ASCII-Zeile den bestehenden processDataPoint()-Zweigen zu. Es gibt kein Statuswort
+// im ASCII-Telegramm, KoSML_cMeterStatus wird hier nie berührt.
+void SMLChannel::processAsciiLine(const char *line, size_t len, ObisAscii::LineKind kind, const ObisAscii::Entry *entry)
+{
+    const bool debug = openknxSMLModule.debug();
+
+    if (debug) logInfoP("> %.*s", (int)len, line);
+
+    if (kind != ObisAscii::LineKind::Data || entry == nullptr) return;
+    if (!isActive()) return;
+
+    // Buchstabencodes (z. B. "C.90.2") haben keine Entsprechung bei den SML-Werten
+    if (entry->letter != '\0')
+    {
+        if (debug) logInfoP("%c.%u.%u: %s", entry->letter, entry->d, entry->e, entry->value);
+        return;
+    }
+
+    if (entry->a != 1) return; // nur Stromzähler erlaubt
+
+    char obis[10] = {};
+    snprintf(obis, 9, "%02d.%02d.%02d", entry->c, entry->d, entry->e);
+
+    if (entry->c == 96 && entry->d == 1 && entry->e == 0) // Zähler ID
+    {
+        char identifier[15] = {};
+        ObisAscii::trimMeterId(entry->value, strlen(entry->value), identifier, sizeof(identifier));
+        publishIdentifier(obis, identifier);
+    }
+    else if (entry->numeric)
+    {
+        char unit[ObisAscii::MaxUnitLen + 1] = {};
+        const double value = ObisAscii::normalizeUnit(entry->number, entry->unit, unit, sizeof(unit));
+        processDataPoint(obis, entry->a, entry->b, entry->c, entry->d, entry->e, entry->f, (double)value, "");
+    }
+    else if (debug)
+    {
+        logInfoP("%s: %s", obis, entry->value);
+    }
 }
 
 #if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
@@ -1095,19 +1305,7 @@ void SMLChannel::processDataPoint(char *obis, const uint8_t &a, const uint8_t &b
                  (uint32_t)(uint8_t)value[6] << 24 | (uint32_t)(uint8_t)value[7] << 16 |
                      (uint32_t)(uint8_t)value[8] << 8 | (uint32_t)(uint8_t)value[9]); // Frabrikationsnummer
 
-        if (openknxSMLModule.debug()) logInfoP("%s: %s", obis, identifier);
-
-#if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
-        _mqttIdentifier = identifier;
-#endif
-
-        if (knx.configured() && openknx.afterStartupDelay() && ParamSML_cIdentifikation)
-        {
-            if (KoSML_cIdentifier.initialized())
-                KoSML_cIdentifier.valueNoSend(identifier, DPT_String_8859_1);
-            else
-                KoSML_cIdentifier.value(identifier, DPT_String_8859_1);
-        }
+        publishIdentifier(obis, identifier);
     }
     else
     {
@@ -1119,5 +1317,23 @@ void SMLChannel::processDataPoint(char *obis, const uint8_t &a, const uint8_t &b
             memcpy(text, value, len);
             logInfoP("%s: %s", obis, text);
         }
+    }
+}
+
+// Gemeinsam für SML und OBIS-ASCII: Zähler-ID ins Log, in das MQTT-Topic und auf das KO
+void SMLChannel::publishIdentifier(const char *obis, const char *identifier)
+{
+    if (openknxSMLModule.debug()) logInfoP("%s: %s", obis, identifier);
+
+#if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
+    _mqttIdentifier = identifier;
+#endif
+
+    if (knx.configured() && openknx.afterStartupDelay() && ParamSML_cIdentifikation)
+    {
+        if (KoSML_cIdentifier.initialized())
+            KoSML_cIdentifier.valueNoSend(identifier, DPT_String_8859_1);
+        else
+            KoSML_cIdentifier.value(identifier, DPT_String_8859_1);
     }
 }

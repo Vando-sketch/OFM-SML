@@ -35,4 +35,4 @@ So lässt sich schon vor dem Einschalten der einzelnen Funktionen live prüfen, 
 ## Konsolenbefehle
 
 - **sml debug** – schaltet eine fortlaufende Anzeige aller empfangenen SML-Daten ein bzw. aus
-- **sml infoXX** – zeigt denselben Status wie das Diagnose-KO direkt auf der Konsole
+- **sml infoXX** – zeigt denselben Status wie das Diagnose-KO direkt auf der Konsole, davor Protokoll, Baudrate und Datenformat (z. B. `ASCII 9600 7E1 1R T0 P`). Das Diagnose-KO selbst antwortet ohne diese Angaben, ein DPT-16-Text fasst nur 14 Zeichen

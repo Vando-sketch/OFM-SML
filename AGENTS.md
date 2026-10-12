@@ -64,7 +64,7 @@ Modul (`SML Gesamtstatus`, Funktions-ID 200) und jeder Kanal (`SML Kanalstatus X
 ## Konsolenbefehle
 
 - **sml debug** – schaltet ausführliches Logging aller OBIS-Werte und Rohtelegramme ein/aus.
-- **sml infoNN** – zeigt den erkannten Zählertyp (1R/2R, höchster Tarif, verfügbare Messgrößen P/V/A/F) für Kanal NN, auch über das Diagnose-KO abrufbar.
+- **sml infoNN** – zeigt den erkannten Zählertyp (1R/2R, höchster Tarif, verfügbare Messgrößen P/V/A/F) für Kanal NN, auch über das Diagnose-KO abrufbar. Nur die Konsole stellt Protokoll, Baudrate und Datenformat voran (`SMLChannel::serialInfo()`, z. B. `ASCII 9600 7E1 1R T0 P`). Das Diagnose-KO ist ein DPT 16: `writeDpt16Ko()` in OGM-Common ruft bei 15 und mehr Zeichen `fatalError()` auf, `diagnoseInfo()` muss deshalb bei höchstens 14 Zeichen bleiben.
 
 ## Regeln für Weiterentwicklung
 

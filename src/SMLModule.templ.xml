@@ -82,6 +82,15 @@
                 <Parameter Id="%AID%_UP-%TT%%CC%155" Name="c%C%FrequencyCyclicTimeBase"  Offset="10" BitOffset="0" ParameterType="%AID%_PT-DelayBase"     Text="" Value="1" />
                 <Parameter Id="%AID%_UP-%TT%%CC%154" Name="c%C%FrequencyCyclicTime"      Offset="10" BitOffset="2" ParameterType="%AID%_PT-DelayTimeMin1" Text="" Value="1" />
               </Union>
+
+              <!-- Schnittstelle; Offset 30-31 reserviert (Plausibilitätsfilter, Aufteilung Bezug/Einspeisung) -->
+              <Union SizeInBit="32">
+                <Memory CodeSegment="%AID%_RS-04-00000" Offset="28" BitOffset="0" />
+                <Parameter Id="%AID%_UP-%TT%%CC%200" Name="c%C%Protocol"       Offset="0" BitOffset="0" ParameterType="%AID%_PT-SMLProtocol"       Text="Protokoll"        Value="0" />
+                <Parameter Id="%AID%_UP-%TT%%CC%201" Name="c%C%Baudrate"       Offset="0" BitOffset="2" ParameterType="%AID%_PT-SMLBaudrate"       Text="Baudrate"         Value="0" />
+                <Parameter Id="%AID%_UP-%TT%%CC%202" Name="c%C%DataFormat"     Offset="0" BitOffset="5" ParameterType="%AID%_PT-SMLDataFormat"     Text="Datenformat"      Value="0" />
+                <Parameter Id="%AID%_UP-%TT%%CC%203" Name="c%C%ReceiveTimeout" Offset="1" BitOffset="0" ParameterType="%AID%_PT-SMLReceiveTimeout" Text="Empfangs-Timeout" Value="5" SuffixText="Sekunden" />
+              </Union>
             </Parameters>
             <ParameterRefs>
               <ParameterRef Id="%AID%_P-%TT%%CC%000_R-%TT%%CC%00001" RefId="%AID%_P-%TT%%CC%000" />
@@ -130,6 +139,10 @@
               <ParameterRef Id="%AID%_UP-%TT%%CC%135_R-%TT%%CC%13501" RefId="%AID%_UP-%TT%%CC%135" />
               <ParameterRef Id="%AID%_UP-%TT%%CC%145_R-%TT%%CC%14501" RefId="%AID%_UP-%TT%%CC%145" />
               <ParameterRef Id="%AID%_UP-%TT%%CC%155_R-%TT%%CC%15501" RefId="%AID%_UP-%TT%%CC%155" />
+              <ParameterRef Id="%AID%_UP-%TT%%CC%200_R-%TT%%CC%20001" RefId="%AID%_UP-%TT%%CC%200" />
+              <ParameterRef Id="%AID%_UP-%TT%%CC%201_R-%TT%%CC%20101" RefId="%AID%_UP-%TT%%CC%201" />
+              <ParameterRef Id="%AID%_UP-%TT%%CC%202_R-%TT%%CC%20201" RefId="%AID%_UP-%TT%%CC%202" />
+              <ParameterRef Id="%AID%_UP-%TT%%CC%203_R-%TT%%CC%20301" RefId="%AID%_UP-%TT%%CC%203" />
             </ParameterRefs>
             <ParameterCalculations>
               <ParameterCalculation Id="%AID%_PC-%TT%%CC%001" Language="JavaScript" Name="SyncType%CC%" RLTransformationFunc="BASE_SyncChannelType" LRTransformationFunc="BASE_SyncChannelType">
@@ -167,6 +180,7 @@
               <ComObject Id="%AID%_O-%TT%%CC%022" Name="c%C%CurrentL2"       Number="%K22%" ObjectSize="4 Bytes"  ReadFlag="Enabled" WriteFlag="Disabled" CommunicationFlag="Enabled" TransmitFlag="Enabled"  UpdateFlag="Disabled" ReadOnInitFlag="Disabled" DatapointType="DPST-14-19" FunctionText="Smartmeter %Z%, OBIS 51.7.0"     Text="{{0:Smartmeter %Z%}}: Strom L2"/>
               <ComObject Id="%AID%_O-%TT%%CC%023" Name="c%C%CurrentL3"       Number="%K23%" ObjectSize="4 Bytes"  ReadFlag="Enabled" WriteFlag="Disabled" CommunicationFlag="Enabled" TransmitFlag="Enabled"  UpdateFlag="Disabled" ReadOnInitFlag="Disabled" DatapointType="DPST-14-19" FunctionText="Smartmeter %Z%, OBIS 71.7.0"     Text="{{0:Smartmeter %Z%}}: Strom L3"/>
               <ComObject Id="%AID%_O-%TT%%CC%024" Name="c%C%MeterStatus"    Number="%K24%" ObjectSize="4 Bytes"  ReadFlag="Enabled" WriteFlag="Disabled" CommunicationFlag="Enabled" TransmitFlag="Disabled" UpdateFlag="Disabled" ReadOnInitFlag="Disabled" DatapointType="DPST-12-1"  FunctionText="Smartmeter %Z%, Statuswort" Text="{{0:Smartmeter %Z%}}: Statuswort (Rohwert)"/>
+              <ComObject Id="%AID%_O-%TT%%CC%025" Name="c%C%Receiving"     Number="%K25%" ObjectSize="1 Bit"    ReadFlag="Enabled" WriteFlag="Disabled" CommunicationFlag="Enabled" TransmitFlag="Enabled"  UpdateFlag="Disabled" ReadOnInitFlag="Disabled" DatapointType="DPST-1-2"   FunctionText="Smartmeter %Z%, Empfangsstatus" Text="{{0:Smartmeter %Z%}}: Zähler empfängt"/>
             </ComObjectTable>
             <ComObjectRefs>
               <ComObjectRef Id="%AID%_O-%TT%%CC%000_R-%TT%%CC%00001" RefId="%AID%_O-%TT%%CC%000" TextParameterRefId="%AID%_P-%TT%%CC%000_R-%TT%%CC%00001" />
@@ -194,6 +208,7 @@
               <ComObjectRef Id="%AID%_O-%TT%%CC%022_R-%TT%%CC%02201" RefId="%AID%_O-%TT%%CC%022" TextParameterRefId="%AID%_P-%TT%%CC%000_R-%TT%%CC%00001"/>
               <ComObjectRef Id="%AID%_O-%TT%%CC%023_R-%TT%%CC%02301" RefId="%AID%_O-%TT%%CC%023" TextParameterRefId="%AID%_P-%TT%%CC%000_R-%TT%%CC%00001"/>
               <ComObjectRef Id="%AID%_O-%TT%%CC%024_R-%TT%%CC%02401" RefId="%AID%_O-%TT%%CC%024" TextParameterRefId="%AID%_P-%TT%%CC%000_R-%TT%%CC%00001"/>
+              <ComObjectRef Id="%AID%_O-%TT%%CC%025_R-%TT%%CC%02501" RefId="%AID%_O-%TT%%CC%025" TextParameterRefId="%AID%_P-%TT%%CC%000_R-%TT%%CC%00001"/>
             </ComObjectRefs>
           </Static>
           <Dynamic>
@@ -224,6 +239,15 @@
                       <ParameterRefRef RefId="%AID%_P-%TT%%CC%011_R-%TT%%CC%01101" IndentLevel="1" HelpContext="%DOC%" />
                       <!-- Suspendiert -->
                       <ParameterRefRef RefId="%AID%_UP-%TT%%CC%106_R-%TT%%CC%10601" IndentLevel="1" HelpContext="BASE-ChannelSuspended" />
+
+                      <ParameterSeparator Id="%AID%_PS-nnn" Text="" UIHint="HorizontalRuler" />
+
+                      <ParameterSeparator Id="%AID%_PS-nnn" Text="Schnittstelle" UIHint="Headline" />
+                      <ParameterRefRef RefId="%AID%_UP-%TT%%CC%200_R-%TT%%CC%20001" IndentLevel="1" HelpContext="SML-Protokoll" />
+                      <ParameterRefRef RefId="%AID%_UP-%TT%%CC%201_R-%TT%%CC%20101" IndentLevel="1" HelpContext="SML-Baudrate" />
+                      <ParameterRefRef RefId="%AID%_UP-%TT%%CC%202_R-%TT%%CC%20201" IndentLevel="1" HelpContext="SML-Datenformat" />
+                      <ParameterRefRef RefId="%AID%_UP-%TT%%CC%203_R-%TT%%CC%20301" IndentLevel="1" HelpContext="SML-EmpfangsTimeout" />
+                      <ComObjectRefRef RefId="%AID%_O-%TT%%CC%025_R-%TT%%CC%02501" />
 
                       <ParameterSeparator Id="%AID%_PS-nnn" Text="" UIHint="HorizontalRuler" />
 
@@ -562,10 +586,15 @@
                                 </when>
                               </choose>
 
-                              <ParameterRefRef RefId="%AID%_UP-%TT%%CC%107_R-%TT%%CC%10701" IndentLevel="1" HelpContext="SML-Statuswort" />
-                              <choose ParamRefId="%AID%_UP-%TT%%CC%107_R-%TT%%CC%10701">
-                                <when test="1">
-                                  <ComObjectRefRef RefId="%AID%_O-%TT%%CC%024_R-%TT%%CC%02401" />
+                              <!-- OBIS-ASCII kennt kein Statuswort -->
+                              <choose ParamRefId="%AID%_UP-%TT%%CC%200_R-%TT%%CC%20001">
+                                <when test="0">
+                                  <ParameterRefRef RefId="%AID%_UP-%TT%%CC%107_R-%TT%%CC%10701" IndentLevel="1" HelpContext="SML-Statuswort" />
+                                  <choose ParamRefId="%AID%_UP-%TT%%CC%107_R-%TT%%CC%10701">
+                                    <when test="1">
+                                      <ComObjectRefRef RefId="%AID%_O-%TT%%CC%024_R-%TT%%CC%02401" />
+                                    </when>
+                                  </choose>
                                 </when>
                               </choose>
                             </ParameterBlock>

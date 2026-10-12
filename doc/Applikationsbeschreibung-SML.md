@@ -6,7 +6,7 @@
 Eine vollständige Applikationsbeschreibung ist unter folgendem Link verfügbar: https://github.com/openknx/OFM-SML/blob/v1/doc/Applikationsbeschreibung-SML.md
 DOCCONTENT -->
 
-Das Modul ermöglicht das Auslesen von Stromzählern in Deutschland, die das SML-Protokoll per Optokoppler unterstützen.
+Das Modul ermöglicht das Auslesen von Stromzählern in Deutschland, die per Optokoppler SML oder OBIS-ASCII (IEC 62056-21, Push-Betrieb) senden.
 
 Die Zähler selbst arbeiten alle nach demselben Prinzip und unterscheiden sich nur darin, welche Werte sie tatsächlich liefern. Bist du dir beim Zählertyp unsicher, kannst du zunächst Zweirichtungszähler mit Zweitarif (2R, HT/NT) wählen — dann werden alle möglichen Zählerstände ausgewertet, unabhängig davon, was der angeschlossene Zähler tatsächlich unterstützt.
 
@@ -15,9 +15,10 @@ Die Zähler selbst arbeiten alle nach demselben Prinzip und unterscheiden sich n
 - **sml debug** – schaltet eine fortlaufende Anzeige aller empfangenen SML-Daten ein bzw. aus, eine erneute Eingabe schaltet sie wieder ab
 - **sml infoXX** – zeigt denselben Status wie das Diagnose-Kommunikationsobjekt (siehe unten) direkt auf der Konsole, XX ist die zweistellige Kanalnummer
 
-**Diagnose:** Über das Diagnose-Kommunikationsobjekt lässt sich live abfragen, was der angeschlossene Zähler tatsächlich sendet, unabhängig von der aktuellen ETS-Parametrierung. Dazu den Text **sml infoXX** an das Diagnose-KO senden, wobei XX die zweistellige Kanalnummer ist, zum Beispiel **sml info01** für den ersten Kanal. Die Antwort basiert auf dem zuletzt empfangenen SML-Telegramm:
+**Diagnose:** Über das Diagnose-Kommunikationsobjekt lässt sich live abfragen, was der angeschlossene Zähler tatsächlich sendet, unabhängig von der aktuellen ETS-Parametrierung. Dazu den Text **sml infoXX** an das Diagnose-KO senden, wobei XX die zweistellige Kanalnummer ist, zum Beispiel **sml info01** für den ersten Kanal. Die Antwort basiert auf dem zuletzt empfangenen Telegramm, zum Beispiel **ASCII 9600 7E1 1R T0 P**:
 
-- **NODATA** – seit mehreren Sekunden ist kein gültiges Telegramm mehr angekommen
+- **SML** / **ASCII**, gefolgt von Baudrate und Datenformat (z. B. **ASCII 9600 7E1**) – eingestelltes Protokoll und tatsächlich verwendete Schnittstellenparameter, steht vor allen weiteren Angaben
+- **NODATA** – seit Ablauf des Empfangs-Timeouts ist kein gültiges Telegramm mehr angekommen
 - **INACTIVE** – der Kanal ist in ETS nicht aktiviert
 - **1R** / **2R** – Einrichtungs- bzw. Zweirichtungszähler
 - **T0** / **T2** – keine Tarife (Eintarifzähler) bzw. zwei Tarife (Hoch-/Niedertarif)
@@ -50,6 +51,43 @@ Generell gilt, dass die Auswahl keine Auswirkung auf die Auswertung bzw. die Kom
 
 Freitext zur Bezeichnung des Smartmeters, z. B. "Hauptzähler" oder "PV-Erzeugungszähler". Dieser Text erscheint als Name des Kanal-Reiters, in der Kanalauswahl-Tabelle sowie in den Bezeichnungen der zugehörigen Kommunikationsobjekte.
 
+
+## **Schnittstelle**
+
+Hier legst du fest, wie der Zähler mit dem Gerät spricht. Für die meisten Zähler passen die Voreinstellungen (SML, 9600 Baud, Datenformat automatisch). Jeder Kanal wird getrennt eingestellt.
+
+Ob der Zähler gerade empfangen wird, zeigt das Kommunikationsobjekt **Zähler empfängt** (DPT 1.002). Es sendet 1, sobald ein gültiges Telegramm ankommt, und 0, wenn innerhalb des Empfangs-Timeouts keines mehr kam. Gesendet wird nur bei einer Änderung. Hat ein Kanal am Gerät keine serielle Schnittstelle (z. B. Kanal B und C beim REG1 Base), bleibt es dauerhaft auf 0, und die Konsole meldet das beim Start einmalig.
+
+<!-- DOC HelpContext="Protokoll" -->
+### **Protokoll**
+
+Legt fest, in welchem Format der Zähler seine Daten an der optischen Schnittstelle ausgibt.
+
+- **SML** – Smart Message Language, binär. So senden die meisten modernen Messeinrichtungen (mME) in Deutschland.
+- **OBIS-ASCII (IEC 62056-21)** – Klartextzeilen wie `1-0:1.8.0*255(021915.9796*kWh)`, die der Zähler ohne Aufforderung zyklisch sendet (Push-Betrieb), z. B. Logarex LK13BE. Eine Abfrage per Anforderungstelegramm (Mode C) wird nicht unterstützt.
+
+Eine automatische Erkennung gibt es nicht. Welches Protokoll dein Zähler spricht, verrät der Konsolenbefehl **sml debug**: Steht der Kanal auf SML und kommen ASCII-Daten an, erscheint einmalig der Hinweis "Sieht nach OBIS-ASCII aus, Protokoll in der ETS umstellen".
+
+Bei OBIS-ASCII gibt es kein Statuswort, der Parameter dazu wird ausgeblendet. Die Identifikationsnummer (OBIS 96.1.0) liefern ASCII-Zähler teils mit führenden Nullen (z. B. 001LOG0067059477). Diese werden entfernt, bis die Nummer wie bei SML 14 Zeichen lang ist und in das Kommunikationsobjekt passt.
+
+Wirkleistung, Spannung und Strom senden viele ASCII-Zähler erst nach Eingabe der PIN und dem Freischalten der erweiterten Datenausgabe (beim Logarex "InF on").
+
+<!-- DOC HelpContext="Baudrate" -->
+### **Baudrate**
+
+Übertragungsgeschwindigkeit der Schnittstelle. SML-Zähler und die meisten ASCII-Zähler im Push-Betrieb senden mit 9600 Baud, ältere Zähler teils mit 300 oder 2400 Baud. Stimmt die Baudrate nicht, kommen zwar Bytes an, es wird aber nie ein gültiges Telegramm erkannt.
+
+<!-- DOC HelpContext="Datenformat" -->
+### **Datenformat**
+
+Datenbits, Parität und Stoppbits der Schnittstelle. **Automatisch** wählt passend zum Protokoll 8N1 (SML) bzw. 7E1 (OBIS-ASCII) und ist fast immer richtig. Nur wenn ein Zähler davon abweicht, gibst du das Format hier fest vor.
+
+Steht ein ASCII-Zähler, der mit 7E1 sendet, auf 8N1, werden die Daten trotzdem korrekt gelesen, weil das Paritätsbit beim Auswerten ausgeblendet wird.
+
+<!-- DOC HelpContext="EmpfangsTimeout" -->
+### **Empfangs-Timeout**
+
+Zeit in Sekunden, nach der ein Kanal als "empfängt nicht" gilt, wenn bis dahin kein gültiges Telegramm angekommen ist. Danach wechselt die Kanal-Status-LED auf rot bzw. aus, und **Zähler empfängt** sendet 0. Der Standardwert von 5 Sekunden passt für Zähler, die etwa jede Sekunde senden. Sendet dein Zähler seltener, erhöhe den Wert, sonst springt der Status zwischen den Telegrammen hin und her.
 
 <!-- DOC -->
 ## **Zählerstände**

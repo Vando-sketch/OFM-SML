@@ -154,6 +154,19 @@ class ObisAsciiParser
         Bcc
     };
 
+    // Zustandsfunktionen (je Zustand eine, feed() verzweigt nur).
+    Result feedBody(char c);
+    Result feedTail(char c);
+    Result feedBcc(char c);
+    // Beginnt ein neues Telegramm mit '/'. false, wenn der Puffer keinen Platz dafür hat.
+    bool beginTelegram();
+    // Verwirft das laufende Telegramm: Grund merken, zurück nach Idle, Länge 0.
+    Result drop(DropReason reason);
+    // '/' am Zeilenanfang im laufenden Telegramm: Dropped/Resync, das '/' startet ein neues Telegramm.
+    Result resync();
+    // Telegramm vollständig: zurück nach Idle, Daten bleiben erhalten.
+    Result complete(bool bccChecked);
+
     char *_storage;
     size_t _capacity;
     size_t _length;

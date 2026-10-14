@@ -18,7 +18,7 @@ Ist im Netzwerkmodul MQTT aktiviert, veröffentlicht jeder Kanal zusätzlich pro
 
 ## Status-LEDs
 
-Modul und jeder Kanal können eine Status-LED anzeigen, nach dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": Farb-LEDs sind rot und blinken bei jedem empfangenen Byte, solange kein gültiges Telegramm erkannt wurde. Einfarbige LEDs bleiben bis zum ersten gültigen Telegramm aus, das Blinken taugt bei ihnen also nicht als Verdrahtungstest. Bei gültigem Empfang leuchtet die LED (grün) und flackert mit den empfangenen Daten. Kommt innerhalb des Empfangs-Timeouts kein gültiges Telegramm mehr, wird sie wieder rot bzw. erlischt.
+Modul und jeder Kanal können eine Status-LED anzeigen, nach dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": Farb-LEDs sind rot und blinken bei jedem empfangenen Byte, solange kein gültiges Telegramm erkannt wurde. Einfarbige LEDs bleiben bis zum ersten gültigen Telegramm aus, das Blinken taugt bei ihnen also nicht als Verdrahtungstest. Bei gültigem Empfang leuchtet die LED (grün) und flackert mit den empfangenen Daten. Kommt innerhalb des Empfangs-Timeouts kein gültiges Telegramm mehr, wird sie wieder rot bzw. erlischt. Nach dem Start wird die LED erst mit dem ersten vollständigen Telegramm grün. Ein Zähler, der nur alle paar Sekunden sendet, braucht dafür entsprechend lange, und ein Telegramm, dessen Anfang beim Einschalten verpasst wurde, zählt nicht. Etwas Geduld ist also normal. `sml debug` zeigt, wann das erste gültige Telegramm ankommt.
 
 ## Diagnose
 

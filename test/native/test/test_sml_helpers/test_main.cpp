@@ -74,7 +74,7 @@ static void test_protocol_name_unknown_is_sml()
 
 static void test_timeout_zero_defaults()
 {
-    TEST_ASSERT_EQUAL_UINT32(5000, timeoutMsFromParam(0));
+    TEST_ASSERT_EQUAL_UINT32(15000, timeoutMsFromParam(0));
 }
 
 static void test_timeout_seconds_to_ms()

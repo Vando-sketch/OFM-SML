@@ -61,7 +61,7 @@ Pro empfangenem Telegramm veröffentlicht jeder Kanal einen JSON-Snapshot mit al
 
 ## Status-LEDs
 
-Modul (`SML Gesamtstatus`, Funktions-ID 200) und jeder Kanal (`SML Kanalstatus X`, ID 201+n) folgen dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": Farb-LEDs blinken rot bei jedem empfangenen Byte, solange kein gültiges Telegramm erkannt wurde; einfarbige LEDs bleiben bis zum ersten gültigen Telegramm dunkel (`ledHelper()` in `SMLModule.cpp`). Bei gültigem Empfang leuchtet die LED, nach Ablauf des Empfangs-Timeouts (ETS-Parameter `c%C%ReceiveTimeout`, 1–255 s) ohne gültigen Empfang wird sie rot bzw. erlischt. Dasselbe Timeout steuert das KO "Zähler empfängt". Der Gesamtstatus des Moduls ist aktiv, sobald mindestens ein Kanal aktiv empfängt.
+Modul (`SML Gesamtstatus`, Funktions-ID 200) und jeder Kanal (`SML Kanalstatus X`, ID 201+n) folgen dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": Farb-LEDs blinken rot bei jedem empfangenen Byte, solange kein gültiges Telegramm erkannt wurde; einfarbige LEDs bleiben bis zum ersten gültigen Telegramm dunkel (`ledHelper()` in `SMLModule.cpp`). Bei gültigem Empfang leuchtet die LED, nach Ablauf des Empfangs-Timeouts (ETS-Parameter `c%C%ReceiveTimeout`, 1–255 s, Standard 15 s ≈ 3 × Sendeabstand, Begründung in der Applikationsbeschreibung) ohne gültigen Empfang wird sie rot bzw. erlischt. Dasselbe Timeout steuert das KO "Zähler empfängt". Der Gesamtstatus des Moduls ist aktiv, sobald mindestens ein Kanal aktiv empfängt.
 
 ## Konsolenbefehle
 

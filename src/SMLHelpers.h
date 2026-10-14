@@ -23,7 +23,7 @@ namespace SMLHelpers
     const char *formatName(SerialFormat fmt);
     const char *protocolName(uint8_t protocol);
 
-    // Empfangs-Timeout in ms. 0 (z. B. nicht initialisierter Parameter) ergibt 5000.
+    // Empfangs-Timeout in ms. 0 (z. B. nicht initialisierter Parameter) ergibt 15000 (ETS-Standardwert).
     uint32_t timeoutMsFromParam(uint8_t seconds);
 
     // true, wenn das letzte gültige Telegramm höchstens timeoutMs her ist (überlaufsicher).

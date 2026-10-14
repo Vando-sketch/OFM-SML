@@ -41,7 +41,7 @@ namespace SMLHelpers
     uint32_t timeoutMsFromParam(uint8_t seconds)
     {
         // 0 liegt außerhalb des ETS-Bereichs (1..255), z. B. bei nicht initialisiertem Speicher
-        if (seconds == 0) return 5000;
+        if (seconds == 0) return 15000; // wie der ETS-Standardwert
         return (uint32_t)seconds * 1000;
     }
 

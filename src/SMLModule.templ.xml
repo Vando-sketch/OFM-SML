@@ -89,7 +89,7 @@
                 <Parameter Id="%AID%_UP-%TT%%CC%200" Name="c%C%Protocol"       Offset="0" BitOffset="0" ParameterType="%AID%_PT-SMLProtocol"       Text="Protokoll"        Value="0" />
                 <Parameter Id="%AID%_UP-%TT%%CC%201" Name="c%C%Baudrate"       Offset="0" BitOffset="2" ParameterType="%AID%_PT-SMLBaudrate"       Text="Baudrate"         Value="0" />
                 <Parameter Id="%AID%_UP-%TT%%CC%202" Name="c%C%DataFormat"     Offset="0" BitOffset="5" ParameterType="%AID%_PT-SMLDataFormat"     Text="Datenformat"      Value="0" />
-                <Parameter Id="%AID%_UP-%TT%%CC%203" Name="c%C%ReceiveTimeout" Offset="1" BitOffset="0" ParameterType="%AID%_PT-SMLReceiveTimeout" Text="Empfangs-Timeout" Value="5" SuffixText="Sekunden" />
+                <Parameter Id="%AID%_UP-%TT%%CC%203" Name="c%C%ReceiveTimeout" Offset="1" BitOffset="0" ParameterType="%AID%_PT-SMLReceiveTimeout" Text="Empfangs-Timeout" Value="15" SuffixText="Sekunden" />
               </Union>
             </Parameters>
             <ParameterRefs>

@@ -262,6 +262,68 @@ static void test_info_tiny_buffers()
     TEST_ASSERT_EQUAL_UINT32(0, formatSerialInfo(nullptr, 0, 0, 9600, SerialFormat::F8N1));
 }
 
+// ---------------------------------------------------------------- Debug-Dump
+
+static void test_dump_hex_and_ascii()
+{
+    const uint8_t buf[] = {0x2F, 0x4C, 0x00, 0xFF, 0xAF};
+    char out[64];
+    size_t n = formatDump(out, sizeof(out), buf, sizeof(buf));
+    // ASCII-Teil mit ausgeblendetem Bit 7 (7E1 als 8N1 gelesen), Steuerzeichen als '.'
+    TEST_ASSERT_EQUAL_STRING("2F 4C 00 FF AF |/L../|", out);
+    TEST_ASSERT_EQUAL_UINT(strlen(out), n);
+}
+
+static void test_dump_only_whole_bytes_when_short()
+{
+    const uint8_t buf[] = {0x31, 0x32, 0x33, 0x34};
+    char out[14]; // reicht für 2 Bytes: "31 32 |12|" = 10 Zeichen, nicht für 3 (14 + NUL)
+    formatDump(out, sizeof(out), buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("31 32 |12|", out);
+}
+
+static void test_dump_empty_and_tiny()
+{
+    char out[8] = "xxxxxxx";
+    TEST_ASSERT_EQUAL_UINT(0, formatDump(out, sizeof(out), nullptr, 0));
+    TEST_ASSERT_EQUAL_STRING("", out);
+    const uint8_t b = 0x41;
+    char one[1] = {'x'};
+    TEST_ASSERT_EQUAL_UINT(0, formatDump(one, sizeof(one), &b, 1));
+    TEST_ASSERT_EQUAL_CHAR('\0', one[0]);
+}
+
+// ---------------------------------------------------------------- SML-Startsequenz im ASCII-Betrieb
+
+static bool feedSeq(SmlStartDetector &d, const uint8_t *b, size_t n)
+{
+    bool hit = false;
+    for (size_t i = 0; i < n; i++)
+        hit = d.feed(b[i]);
+    return hit;
+}
+
+static void test_sml_start_detected()
+{
+    SmlStartDetector d;
+    const uint8_t seq[] = {0x00, 0x1B, 0x1B, 0x1B, 0x1B, 0x01, 0x01, 0x01, 0x01};
+    TEST_ASSERT_TRUE(feedSeq(d, seq, sizeof(seq)));
+}
+
+static void test_sml_start_with_extra_escape()
+{
+    SmlStartDetector d;
+    const uint8_t seq[] = {0x1B, 0x1B, 0x1B, 0x1B, 0x1B, 0x01, 0x01, 0x01, 0x01};
+    TEST_ASSERT_TRUE(feedSeq(d, seq, sizeof(seq)));
+}
+
+static void test_sml_start_interrupted()
+{
+    SmlStartDetector d;
+    const uint8_t seq[] = {0x1B, 0x1B, 0x1B, 0x1B, 0x01, 0x01, 0x02, 0x01, 0x01};
+    TEST_ASSERT_FALSE(feedSeq(d, seq, sizeof(seq)));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -292,5 +354,11 @@ int main(int, char **)
     RUN_TEST(test_info_truncation);
     RUN_TEST(test_info_exact_fit_and_one_short);
     RUN_TEST(test_info_tiny_buffers);
+    RUN_TEST(test_dump_hex_and_ascii);
+    RUN_TEST(test_dump_only_whole_bytes_when_short);
+    RUN_TEST(test_dump_empty_and_tiny);
+    RUN_TEST(test_sml_start_detected);
+    RUN_TEST(test_sml_start_with_extra_escape);
+    RUN_TEST(test_sml_start_interrupted);
     return UNITY_END();
 }

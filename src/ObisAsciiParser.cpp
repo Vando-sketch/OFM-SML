@@ -322,7 +322,7 @@ namespace ObisAscii
 
 ObisAsciiParser::ObisAsciiParser(char *storage, size_t capacity)
     : _storage(storage), _capacity(capacity), _length(0), _state(State::Idle), _stxSeen(false), _bcc(0),
-      _lastDrop(DropReason::None), _bccChecked(false)
+      _lastDrop(DropReason::None), _bccChecked(false), _droppedLength(0), _rawByte(0), _droppedByte(0)
 {
 }
 
@@ -330,6 +330,7 @@ ObisAsciiParser::Result ObisAsciiParser::feed(uint8_t byte)
 {
     // 7E1-Daten werden als 8N1 gelesen: Paritätsbit ausblenden.
     const char c = (char)(byte & 0x7F);
+    _rawByte = byte;
     switch (_state)
     {
         case State::Idle:
@@ -361,6 +362,13 @@ ObisAsciiParser::Result ObisAsciiParser::feedBody(char c)
     const bool lineStart = _length > 0 && _storage[_length - 1] == '\n';
     if (c == '/' && lineStart)
         return resync();
+
+    // Ein OBIS-ASCII-Telegramm besteht nur aus druckbaren Zeichen und Zeilenenden
+    if ((c < 0x20 && c != '\r' && c != '\n' && c != '\t') || c == 0x7F)
+    {
+        _droppedByte = _rawByte;
+        return drop(DropReason::Garbage);
+    }
 
     if (_length >= _capacity)
         return drop(DropReason::Overflow);
@@ -423,6 +431,7 @@ ObisAsciiParser::Result ObisAsciiParser::drop(DropReason reason)
 {
     _lastDrop = reason;
     _state = State::Idle;
+    _droppedLength = _length;
     _length = 0;
     return Result::Dropped;
 }
@@ -456,6 +465,16 @@ ObisAsciiParser::DropReason ObisAsciiParser::lastDropReason() const
     return _lastDrop;
 }
 
+size_t ObisAsciiParser::droppedLength() const
+{
+    return _droppedLength;
+}
+
+uint8_t ObisAsciiParser::droppedByte() const
+{
+    return _droppedByte;
+}
+
 bool ObisAsciiParser::bccChecked() const
 {
     return _bccChecked;
@@ -469,4 +488,6 @@ void ObisAsciiParser::reset()
     _bcc = 0;
     _lastDrop = DropReason::None;
     _bccChecked = false;
+    _droppedLength = 0;
+    _droppedByte = 0;
 }

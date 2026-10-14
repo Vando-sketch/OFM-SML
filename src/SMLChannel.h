@@ -59,6 +59,14 @@ class SMLChannel : public OpenKNX::Channel
     bool _noSerialLogged = false;   // Warnung "keine Schnittstelle" nur einmal
     bool _asciiHintLogged = false;  // ASCII-Hinweis im SML-Betrieb nur einmal pro Start
 
+    // Diagnose im ASCII-Betrieb, wenn Bytes ankommen, aber kein gültiges Telegramm
+    SMLHelpers::SmlStartDetector _smlDetector;
+    bool _smlInAsciiHintLogged = false;    // "Zähler sendet SML" nur einmal pro Start
+    bool _asciiSettingsHintLogged = false; // Hinweis Baudrate/Datenformat nur einmal pro Start
+    uint16_t _asciiBadDrops = 0;           // verworfene Telegramme seit dem letzten gültigen
+    uint32_t _asciiLastDump = 0;           // Zeitpunkt des letzten Debug-Dumps
+    uint16_t _asciiSuppressedDumps = 0;    // seitdem unterdrückte Dumps
+
     int64_t _sentCounterIn = 0;
     int64_t _sentCounterInT1 = 0;
     int64_t _sentCounterInT2 = 0;
@@ -142,6 +150,7 @@ class SMLChannel : public OpenKNX::Channel
     void processFileAscii();
     void writeBufferSml(uint8_t byte);
     void writeBufferAscii(uint8_t byte);
+    void logAsciiDrop(const char *reason);
     bool isAscii();
     void publishIdentifier(const char *obis, const char *identifier);
 

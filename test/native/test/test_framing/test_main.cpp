@@ -418,6 +418,89 @@ static void test_reset_in_bcc_tail_drops_stx_state()
     TEST_ASSERT_FALSE(r.parser.bccChecked());
 }
 
+// ---------------------------------------------------------------- Müll (falsche Baudrate / falsches Protokoll)
+
+// Bei falscher Baudrate kommen zufällige Bytes an. Ein zufälliges '/' startete bisher ein Telegramm, das
+// erst nach OPENKNX_SML_BUFFER Bytes per Overflow verworfen wurde. Ein Steuerzeichen im Telegramm verwirft es sofort.
+static void test_garbage_byte_drops_immediately_and_keeps_prefix()
+{
+    Rig r;
+    std::string s = "/LOG5LK13\r\n1-0:1.8";
+    s.push_back((char)0x00);
+    FeedStats st = feedAll(r.parser, s);
+    TEST_ASSERT_EQUAL_INT(1, st.dropped);
+    TEST_ASSERT_EQUAL_INT((long)s.size() - 1, st.droppedAt);
+    assertDrop(Drop::Garbage, r.parser.lastDropReason());
+    // Für den Debug-Dump: was bis zum Abbruch gesammelt war, bleibt lesbar
+    TEST_ASSERT_EQUAL_UINT(s.size() - 1, r.parser.droppedLength());
+    TEST_ASSERT_EQUAL_MEMORY(s.data(), r.parser.data(), s.size() - 1);
+    TEST_ASSERT_EQUAL_HEX8(0x00, r.parser.droppedByte());
+}
+
+static void test_garbage_reports_unmasked_byte()
+{
+    Rig r;
+    std::string s = "/AB";
+    s.push_back((char)0x9B); // & 0x7F = ESC
+    feedAll(r.parser, s);
+    assertDrop(Drop::Garbage, r.parser.lastDropReason());
+    TEST_ASSERT_EQUAL_HEX8(0x9B, r.parser.droppedByte());
+}
+
+static void test_tab_is_not_garbage()
+{
+    Rig r;
+    std::string tel = "/X\r\n1.8.0(1*kWh)\t\r\n!";
+    FeedStats st = feedAll(r.parser, tel);
+    TEST_ASSERT_EQUAL_INT(1, st.complete);
+    TEST_ASSERT_EQUAL_INT(0, st.dropped);
+}
+
+static void test_garbage_then_valid_telegram_completes()
+{
+    Rig r;
+    std::string junk = "/x";
+    junk.push_back((char)0x01);
+    FeedStats st = feedAll(r.parser, junk);
+    TEST_ASSERT_EQUAL_INT(1, st.dropped);
+    std::string tel = sample("\r\n");
+    FeedStats st2 = feedAll(r.parser, tel);
+    TEST_ASSERT_EQUAL_INT(1, st2.complete);
+    assertStr(tel, dataOf(r.parser));
+}
+
+// Rauschen wie bei falscher Baudrate (deterministischer Pseudozufall): nie Complete, nie Overflow.
+static void test_wrong_baud_noise_never_overflows()
+{
+    Rig r;
+    uint32_t x = 0x12345678u;
+    int overflow = 0, garbage = 0, complete = 0;
+    for (int i = 0; i < 20000; i++)
+    {
+        x = x * 1664525u + 1013904223u;
+        uint8_t b = (uint8_t)(x >> 24);
+        if (i % 50 == 0) b = '/'; // genug Startzeichen
+        Res res = r.parser.feed(b);
+        if (res == Res::Complete) complete++;
+        if (res == Res::Dropped && r.parser.lastDropReason() == Drop::Overflow) overflow++;
+        if (res == Res::Dropped && r.parser.lastDropReason() == Drop::Garbage) garbage++;
+    }
+    TEST_ASSERT_EQUAL_INT(0, complete);
+    TEST_ASSERT_EQUAL_INT(0, overflow);
+    TEST_ASSERT_TRUE(garbage > 100);
+}
+
+static void test_overflow_keeps_dropped_length_and_data()
+{
+    Rig r(64);
+    std::string tel = sample("\r\n");
+    feedAll(r.parser, tel);
+    assertDrop(Drop::Overflow, r.parser.lastDropReason());
+    TEST_ASSERT_EQUAL_UINT(64, r.parser.droppedLength());
+    TEST_ASSERT_EQUAL_MEMORY(tel.data(), r.parser.data(), 64);
+    TEST_ASSERT_EQUAL_UINT(0, r.parser.length());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -451,5 +534,11 @@ int main(int, char **)
     RUN_TEST(test_reset_clears_drop_reason_and_new_telegram_has_no_old_content);
     RUN_TEST(test_reset_after_complete);
     RUN_TEST(test_reset_in_bcc_tail_drops_stx_state);
+    RUN_TEST(test_garbage_byte_drops_immediately_and_keeps_prefix);
+    RUN_TEST(test_garbage_reports_unmasked_byte);
+    RUN_TEST(test_tab_is_not_garbage);
+    RUN_TEST(test_garbage_then_valid_telegram_completes);
+    RUN_TEST(test_wrong_baud_noise_never_overflows);
+    RUN_TEST(test_overflow_keeps_dropped_length_and_data);
     return UNITY_END();
 }

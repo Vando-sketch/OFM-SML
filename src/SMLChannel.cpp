@@ -383,6 +383,13 @@ void SMLChannel::writeBufferSml(uint8_t byte)
 
 void SMLChannel::writeBufferAscii(uint8_t byte)
 {
+    // Sendet der Zähler SML, kommt im ASCII-Betrieb nie ein gültiges Telegramm zustande
+    if (!_smlInAsciiHintLogged && _smlDetector.feed(byte))
+    {
+        logWarningP("Zähler sendet SML, Protokoll in der ETS auf SML umstellen");
+        _smlInAsciiHintLogged = true;
+    }
+
     const ObisAsciiParser::Result result = _asciiParser.feed(byte);
     if (result == ObisAsciiParser::Result::None) return;
 
@@ -392,10 +399,14 @@ void SMLChannel::writeBufferAscii(uint8_t byte)
         {
             case ObisAsciiParser::DropReason::Overflow:
                 logErrorP("No end of OBIS-ASCII telegram within %u bytes, telegram dropped", OPENKNX_SML_BUFFER);
+                logAsciiDrop("Pufferüberlauf");
+                break;
+            case ObisAsciiParser::DropReason::Garbage:
+                logAsciiDrop("Steuerzeichen");
                 break;
             case ObisAsciiParser::DropReason::Resync:
                 if (openknxSMLModule.debug()) logWarningP("OBIS-ASCII telegram dropped (new telegram started)");
-                break;
+                return; // Resync heißt: es kommen Telegramme an, das zählt nicht als Fehler
             case ObisAsciiParser::DropReason::BccMismatch:
                 if (openknxSMLModule.debug()) logWarningP("OBIS-ASCII telegram dropped (BCC mismatch)");
                 break;
@@ -405,8 +416,26 @@ void SMLChannel::writeBufferAscii(uint8_t byte)
             default:
                 break;
         }
+
+        // Unabhängig vom Debug-Modus und nur einmal pro Start: Es kommen Bytes an, aber nie ein gültiges
+        // Telegramm. Fast immer passen Baudrate oder Datenformat nicht zum Zähler.
+        if (_asciiBadDrops < UINT16_MAX) _asciiBadDrops++;
+        if (!_asciiSettingsHintLogged && _asciiBadDrops >= 3)
+        {
+            _asciiSettingsHintLogged = true;
+            char info[24] = {};
+            SMLHelpers::formatSerialInfo(info, sizeof(info), ParamSML_cProtocol,
+                                         SMLHelpers::baudFromParam(ParamSML_cBaudrate),
+                                         SMLHelpers::formatFromParams(ParamSML_cProtocol, ParamSML_cDataFormat));
+            if (_asciiParser.lastDropReason() == ObisAsciiParser::DropReason::Overflow)
+                logWarningP("Daten lesbar, aber kein Telegrammende ('!') innerhalb von %u Bytes: Telegramm zu lang für OPENKNX_SML_BUFFER?", OPENKNX_SML_BUFFER);
+            else
+                logWarningP("Daten kommen an, aber kein gültiges OBIS-ASCII-Telegramm (%s): Baudrate und Datenformat prüfen, Logarex LK13: 9600 Baud, 7E1. Details mit \"sml debug\"", info);
+        }
         return;
     }
+
+    _asciiBadDrops = 0;
 
     // Complete: Kopie an processFile() übergeben, _buffer gehört gleich wieder dem Parser
     const size_t length = _asciiParser.length();
@@ -430,6 +459,38 @@ void SMLChannel::writeBufferAscii(uint8_t byte)
         logErrorP("OBIS-ASCII telegram dropped (out of memory)");
     }
     unlockBuffer();
+}
+
+// Debug: zeigt, was vor dem Verwerfen im Puffer stand. Lesbare Zeilen sprechen für ein zu langes
+// Telegramm, Zeichensalat für falsche Baudrate bzw. falsches Datenformat. Höchstens alle 2 s ein Dump.
+void SMLChannel::logAsciiDrop(const char *reason)
+{
+    if (!openknxSMLModule.debug()) return;
+
+    if (_asciiLastDump != 0 && !delayCheck(_asciiLastDump, 2000))
+    {
+        if (_asciiSuppressedDumps < UINT16_MAX) _asciiSuppressedDumps++;
+        return;
+    }
+    _asciiLastDump = millis();
+
+    const uint8_t *data = (const uint8_t *)_asciiParser.data();
+    const size_t length = _asciiParser.droppedLength();
+    const size_t head = length < 32 ? length : 32;
+    char dump[4 * 32 + 3];
+
+    logInfoP("OBIS-ASCII verworfen (%s) nach %u Bytes, auslösendes Byte 0x%02X, %u weitere seit dem letzten Dump",
+             reason, (unsigned)length, _asciiParser.droppedByte(), _asciiSuppressedDumps);
+    _asciiSuppressedDumps = 0;
+    logIndentUp();
+    SMLHelpers::formatDump(dump, sizeof(dump), data, head);
+    logInfoP("Anfang: %s", dump);
+    if (length > 32)
+    {
+        SMLHelpers::formatDump(dump, sizeof(dump), data + length - 32, 32);
+        logInfoP("Ende:   %s", dump);
+    }
+    logIndentDown();
 }
 
 // Beginnt die Aufzeichnung mit der Startsequenz an Position 0. Damit liegt der Rahmen

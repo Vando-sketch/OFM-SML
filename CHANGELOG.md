@@ -6,6 +6,7 @@
 - Neu: Kommunikationsobjekt "Zähler empfängt" (DPT 1.002) pro Kanal, sendet bei Änderung.
 - Neu: `sml info` zeigt auf der Konsole zusätzlich Protokoll, Baudrate und Datenformat, z. B. `ASCII 9600 7E1 1R T0 P`. Das Diagnose-KO antwortet unverändert kurz (DPT 16, 14 Zeichen).
 - Neu: `sml debug` gibt im ASCII-Betrieb jede Rohzeile, die Kennungszeile und die Zahl verworfener Zeilen aus. Im SML-Betrieb erscheint einmalig ein Hinweis, wenn die empfangenen Daten nach OBIS-ASCII aussehen.
+- Neu: Fehlersuche bei falscher Baudrate oder falschem Datenformat im ASCII-Betrieb. Ein Telegramm mit Steuerzeichen wird sofort verworfen statt erst nach `OPENKNX_SML_BUFFER` Bytes per Pufferüberlauf. Nach drei verworfenen Telegrammen meldet die Konsole einmalig "Daten kommen an, aber kein gültiges OBIS-ASCII-Telegramm" mit der aktuellen Einstellung. `sml debug` zeigt dazu Anfang und Ende der verworfenen Daten als Hex-/ASCII-Dump. Sendet der Zähler SML, erscheint einmalig "Zähler sendet SML, Protokoll in der ETS auf SML umstellen".
 - Geändert: Der Empfangs-Timeout für Status-LED und Statusauswertung ist jetzt pro Kanal einstellbar (bisher fest 5 Sekunden).
 - Geändert: Kanäle ohne serielle Schnittstelle werten ihren Status trotzdem aus und melden beim Start einmalig einen Hinweis.
 - ⚠️ Der Parameterblock pro Kanal wächst von 28 auf 32 Byte und jeder Kanal bekommt ein weiteres Kommunikationsobjekt. Nach dem Update ist ein vollständiger Download in der ETS nötig.

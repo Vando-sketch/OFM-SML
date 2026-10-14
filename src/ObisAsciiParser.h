@@ -105,6 +105,11 @@ namespace ObisAscii
 //    Treffer -> Complete (bccChecked()==true), sonst Dropped/BccMismatch.
 //    Anderes Byte zwischen '!' und ETX -> Dropped/Framing ('/' dort -> Dropped/Resync + Neustart).
 //  - Overflow: würde ein Byte die Kapazität überschreiten -> Dropped/Overflow, zurück nach Idle.
+//  - Garbage: ein Steuerzeichen im Telegramm (alles unter 0x20 außer CR, LF, TAB, STX sowie 0x7F, nach dem
+//    Maskieren) -> sofort Dropped/Garbage. Typisch für falsche Baudrate oder einen SML-Zähler; ohne diese Regel
+//    würde ein zufälliges '/' im Rauschen erst nach `capacity` Bytes per Overflow verworfen.
+//  - Nach Dropped/Overflow bzw. Dropped/Garbage stehen die bis dahin gesammelten Bytes für einen Debug-Dump noch
+//    in data() (Länge droppedLength()), bis das nächste '/' kommt.
 //  - Ein abgebrochenes Telegramm (kein '!', kein neues '/') liefert nie Complete.
 //  - Nach Complete/Dropped ist der Parser wieder Idle; data()/length() eines Complete bleiben
 //    bis zum nächsten feed() gültig.
@@ -123,7 +128,8 @@ class ObisAsciiParser
         Overflow,
         Resync,
         BccMismatch,
-        Framing
+        Framing,
+        Garbage
     };
 
     // storage/capacity: vom Aufrufer gestellter Puffer für das Telegramm.
@@ -138,6 +144,12 @@ class ObisAsciiParser
 
     // Grund des letzten Dropped (None nach reset()).
     DropReason lastDropReason() const;
+
+    // Anzahl der Bytes, die beim letzten Dropped in data() standen (für den Debug-Dump).
+    size_t droppedLength() const;
+
+    // Unmaskiertes Byte, das das letzte Dropped/Garbage ausgelöst hat.
+    uint8_t droppedByte() const;
 
     // true, wenn das letzte Complete per BCC geprüft wurde.
     bool bccChecked() const;
@@ -175,4 +187,7 @@ class ObisAsciiParser
     uint8_t _bcc;
     DropReason _lastDrop;
     bool _bccChecked;
+    size_t _droppedLength;
+    uint8_t _rawByte;
+    uint8_t _droppedByte;
 };

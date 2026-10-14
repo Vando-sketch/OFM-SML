@@ -67,7 +67,7 @@ Legt fest, in welchem Format der Zähler seine Daten an der optischen Schnittste
 - **SML** – Smart Message Language, binär. So senden die meisten modernen Messeinrichtungen (mME) in Deutschland.
 - **OBIS-ASCII (IEC 62056-21)** – Klartextzeilen wie `1-0:1.8.0*255(021915.9796*kWh)`, die der Zähler ohne Aufforderung zyklisch sendet (Push-Betrieb), z. B. Logarex LK13BE. Eine Abfrage per Anforderungstelegramm (Mode C) wird nicht unterstützt.
 
-Eine automatische Erkennung gibt es nicht. Welches Protokoll dein Zähler spricht, verrät der Konsolenbefehl **sml debug**: Steht der Kanal auf SML und kommen ASCII-Daten an, erscheint einmalig der Hinweis "Sieht nach OBIS-ASCII aus, Protokoll in der ETS umstellen".
+Eine automatische Erkennung gibt es nicht. Welches Protokoll dein Zähler spricht, verrät der Konsolenbefehl **sml debug**: Steht der Kanal auf SML und kommen ASCII-Daten an, erscheint einmalig der Hinweis "Sieht nach OBIS-ASCII aus, Protokoll in der ETS umstellen". Umgekehrt meldet ein auf OBIS-ASCII gestellter Kanal einmalig "Zähler sendet SML, Protokoll in der ETS auf SML umstellen", sobald er die SML-Startsequenz sieht.
 
 Bei OBIS-ASCII gibt es kein Statuswort, der Parameter dazu wird ausgeblendet. Die Identifikationsnummer (OBIS 96.1.0) liefern ASCII-Zähler teils mit führenden Nullen (z. B. 001LOG0067059477). Diese werden entfernt, bis die Nummer wie bei SML 14 Zeichen lang ist und in das Kommunikationsobjekt passt.
 
@@ -76,7 +76,7 @@ Wirkleistung, Spannung und Strom senden viele ASCII-Zähler erst nach Eingabe de
 <!-- DOC HelpContext="Baudrate" -->
 ### **Baudrate**
 
-Übertragungsgeschwindigkeit der Schnittstelle. SML-Zähler und die meisten ASCII-Zähler im Push-Betrieb senden mit 9600 Baud, ältere Zähler teils mit 300 oder 2400 Baud. Stimmt die Baudrate nicht, kommen zwar Bytes an, es wird aber nie ein gültiges Telegramm erkannt.
+Übertragungsgeschwindigkeit der Schnittstelle. SML-Zähler und die meisten ASCII-Zähler im Push-Betrieb senden mit 9600 Baud, ältere Zähler teils mit 300 oder 2400 Baud. Stimmt die Baudrate nicht, kommen zwar Bytes an, es wird aber nie ein gültiges Telegramm erkannt. Die Konsole meldet das dann einmalig mit "Daten kommen an, aber kein gültiges OBIS-ASCII-Telegramm". Mit **sml debug** zeigt sie zusätzlich den Anfang der verworfenen Daten als Hex-Dump: lesbare Zeilen wie `1-0:1.8.0` bedeuten, die Einstellung passt; Zeichensalat bedeutet, Baudrate oder Datenformat sind falsch.
 
 <!-- DOC HelpContext="Datenformat" -->
 ### **Datenformat**

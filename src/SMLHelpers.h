@@ -37,4 +37,19 @@ namespace SMLHelpers
     // Schreibt z. B. "ASCII 9600 7E1" bzw. "SML 9600 8N1". Immer NUL-terminiert, gekürzt auf
     // outSize-1. Rückgabe: Anzahl geschriebener Zeichen ohne NUL.
     size_t formatSerialInfo(char *out, size_t outSize, uint8_t protocol, uint32_t baud, SerialFormat fmt);
+
+    // Hex- und ASCII-Dump für das Debug-Log, z. B. "2F 4C 00 |/L.|". Im ASCII-Teil wird Bit 7
+    // ausgeblendet (7E1 als 8N1 gelesen), nicht druckbare Zeichen erscheinen als '.'. Passen nicht alle
+    // Bytes in out, werden nur so viele ganze Bytes ausgegeben, wie Platz haben. Immer NUL-terminiert.
+    // Rückgabe: Anzahl geschriebener Zeichen ohne NUL.
+    size_t formatDump(char *out, size_t outSize, const uint8_t *buf, size_t len);
+
+    // Erkennt die SML-Startsequenz 1B1B1B1B 01010101 in einem Bytestrom. feed() liefert true
+    // beim letzten Byte der Sequenz. Für den Hinweis "Zähler sendet SML" im OBIS-ASCII-Betrieb.
+    struct SmlStartDetector
+    {
+        uint8_t escapes = 0;
+        uint8_t ones = 0;
+        bool feed(uint8_t byte);
+    };
 } // namespace SMLHelpers

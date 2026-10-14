@@ -80,6 +80,11 @@ namespace ObisAscii
     // Eine fehlerhafte Zeile verwirft den Rest des Telegramms nicht. `cb` darf nullptr sein.
     Summary parseTelegram(const char *text, size_t len, LineCallback cb, void *ctx);
 
+    // true für den aktuellen Wert (Gruppe F = 255 oder ohne F). Andere F sind Vorwerte, z. B.
+    // 1.8.0*96 … *100 beim Logarex (Verbrauch zurückliegender Zeiträume), und dürfen den
+    // Zählerstand nicht überschreiben.
+    bool isCurrentValue(const Entry &entry);
+
     // Rechnet kWh -> Wh und kW -> W um (Groß-/Kleinschreibung egal). Alle anderen Einheiten
     // bleiben unverändert. outUnit wird immer NUL-terminiert und auf outUnitSize-1 gekürzt.
     double normalizeUnit(double value, const char *unit, char *outUnit, size_t outUnitSize);

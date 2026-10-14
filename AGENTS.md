@@ -37,6 +37,7 @@ Die Kanalanzahl wird durch das OAM über `SML_ChannelCount` vorgegeben. Jeder Ka
 - `writeBuffer()` verzweigt nach Protokoll; der SML-Teil steht unverändert in `writeBufferSml()`. Das fertige ASCII-Telegramm wird wie `_smlBuffer` per Mutex an `processFile()` übergeben.
 - Jeder ASCII-Wert endet im bestehenden `processDataPoint(obis, a, b, c, d, e, f, double, statusSuffix)`. Einheiten werden vorher normiert (kWh → Wh, kW → W), damit KOs, MQTT und `sml info` für beide Protokolle identisch arbeiten. Neue OBIS-Codes daher nur dort ergänzen, nicht im Parser.
 - Ein Steuerzeichen im laufenden Telegramm verwirft es sofort (`DropReason::Garbage`), damit falsche Baudrate/falsches Format nicht als Pufferüberlauf erscheinen. Diagnose (einmaliger Hinweis, Hex-Dump in `sml debug`) steht in `SMLChannel::writeBufferAscii()`/`logAsciiDrop()`.
+- Nur aktuelle Werte (Gruppe F = 255, `ObisAscii::isCurrentValue()`) gehen an `processDataPoint()`. Vorwerte wie `1.8.0*96` würden sonst den Zählerstand überschreiben, weil `processDataPoint()` F nicht auswertet.
 - Die Identifikationsnummer (96.1.0) wird um führende Nullen gekürzt, bis sie 14 Zeichen lang ist (DPT 16.001).
 - Parameterblock pro Kanal: 32 Byte. Offset 28–29 belegt (Protokoll, Baudrate, Datenformat, Empfangs-Timeout), Offset 30–31 reserviert.
 

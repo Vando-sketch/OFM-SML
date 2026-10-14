@@ -461,6 +461,28 @@ void SMLChannel::writeBufferAscii(uint8_t byte)
     unlockBuffer();
 }
 
+// Merkt sich den Zeitpunkt eines gültigen Telegramms. Sendet der Zähler seltener, als der
+// Empfangs-Timeout erlaubt, springen Status-LED und "Zähler empfängt" zwischen den Telegrammen
+// auf aus/rot. Das wird einmal pro Start gemeldet, mit dem gemessenen Abstand.
+void SMLChannel::noteValidTelegram()
+{
+    const uint32_t now = millis();
+    if (_lastReceivedFile != 0)
+    {
+        const uint32_t interval = now - _lastReceivedFile;
+        const uint32_t timeout = SMLHelpers::timeoutMsFromParam(ParamSML_cReceiveTimeout);
+        if (openknxSMLModule.debug()) logInfoP("Abstand zum letzten Telegramm: %u ms", interval);
+        // Lücken über 5 Minuten sind Ausfälle (Lesekopf ab, Neustart), kein Sendeabstand
+        if (!_intervalHintLogged && interval >= timeout && interval < 300000)
+        {
+            logWarningP("Zähler sendet nur alle %u s, Empfangs-Timeout ist %u s: Timeout in der ETS größer einstellen",
+                        (unsigned)((interval + 999) / 1000), (unsigned)(timeout / 1000));
+            _intervalHintLogged = true;
+        }
+    }
+    _lastReceivedFile = now;
+}
+
 // Debug: zeigt, was vor dem Verwerfen im Puffer stand. Lesbare Zeilen sprechen für ein zu langes
 // Telegramm, Zeichensalat für falsche Baudrate bzw. falsches Datenformat. Höchstens alle 2 s ein Dump.
 void SMLChannel::logAsciiDrop(const char *reason)
@@ -599,7 +621,7 @@ void SMLChannel::processFile()
         logHexDebugP(currentBuffer->buffer, currentBuffer->buffer_len);
     }
 
-    _lastReceivedFile = millis();
+    noteValidTelegram();
     _features = {};
     _statusSentThisFile = false;
 #if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
@@ -695,7 +717,7 @@ void SMLChannel::processFileAscii()
         logIndentUp();
     }
 
-    _lastReceivedFile = millis();
+    noteValidTelegram();
     _features = {};
     _statusSentThisFile = false;
 #if (defined(KNX_IP_WIFI) || defined(KNX_IP_LAN)) && defined(OPENKNX_MQTT)
@@ -745,6 +767,13 @@ void SMLChannel::processAsciiLine(const char *line, size_t len, ObisAscii::LineK
 
     char obis[10] = {};
     snprintf(obis, 9, "%02d.%02d.%02d", entry->c, entry->d, entry->e);
+
+    // Vorwerte (F != 255, z. B. 1.8.0*96 … *100) würden sonst den aktuellen Zählerstand überschreiben
+    if (!ObisAscii::isCurrentValue(*entry))
+    {
+        if (debug) logInfoP("%s*%u: %s %s (Vorwert, ignoriert)", obis, entry->f, entry->value, entry->unit);
+        return;
+    }
 
     if (entry->c == 96 && entry->d == 1 && entry->e == 0) // Zähler ID
     {
@@ -1292,7 +1321,7 @@ void SMLChannel::processDataPoint(char *obis, const uint8_t &a, const uint8_t &b
     }
     else if (c == 14 && d == 7)
     {
-        if (openknxSMLModule.debug()) logInfoP("%s: %.1f Herz%s", obis, value, statusSuffix);
+        if (openknxSMLModule.debug()) logInfoP("%s: %.1f Hertz%s", obis, value, statusSuffix);
 
         _features.frequency = true;
 

@@ -183,6 +183,92 @@ static void test_len_parameter_is_honoured()
     TEST_ASSERT_EQUAL_UINT16(1, s.entries);
 }
 
+// ---------------------------------------------------------------- Feldtelegramm Logarex LK13BE mit "InF on"
+
+// Originaltelegramm aus einem Feldlog (674 Byte, Leerzeile nach der Kennung). Enthält Vorwerte
+// 1.8.0*96 … *100 (Verbrauch der letzten Tage/Monate/Jahre), die NICHT als Zählerstand gelten dürfen.
+static std::string fieldTelegram()
+{
+    return "/LOG5LK13BE803039\r\n\r\n"
+           "1-0:96.1.0*255(001LOG0065547018)\r\n"
+           "1-0:1.8.0*255(007003.0386*kWh)\r\n"
+           "1-0:2.8.0*255(000000.0000*kWh)\r\n"
+           "1-0:16.7.0*255(000395*W)\r\n"
+           "1-0:32.7.0*255(238.6*V)\r\n"
+           "1-0:52.7.0*255(238.3*V)\r\n"
+           "1-0:72.7.0*255(239.3*V)\r\n"
+           "1-0:31.7.0*255(000.71*A)\r\n"
+           "1-0:51.7.0*255(000.84*A)\r\n"
+           "1-0:71.7.0*255(000.80*A)\r\n"
+           "1-0:81.7.1*255(117*deg)\r\n"
+           "1-0:81.7.2*255(234*deg)\r\n"
+           "1-0:81.7.4*255(053*deg)\r\n"
+           "1-0:81.7.15*255(056*deg)\r\n"
+           "1-0:81.7.26*255(017*deg)\r\n"
+           "1-0:14.7.0*255(49.9*Hz)\r\n"
+           "1-0:1.8.0*96(00005.4*kWh)\r\n"
+           "1-0:1.8.0*97(00044.5*kWh)\r\n"
+           "1-0:1.8.0*98(00438.4*kWh)\r\n"
+           "1-0:1.8.0*99(04205.1*kWh)\r\n"
+           "1-0:1.8.0*100(07003.0*kWh)\r\n"
+           "1-0:0.2.0*255(ver.03,432F,20170504)\r\n"
+           "1-0:96.90.2*255(0F66)\r\n"
+           "1-0:97.97.0*255(00000000)\r\n"
+           "!";
+}
+
+static void test_field_telegram_frames_as_in_log()
+{
+    Rig r(1024);
+    std::string tel = fieldTelegram();
+    FeedStats st = feedAll(r.parser, encode7E1(tel) + "\r\n");
+    TEST_ASSERT_EQUAL_INT(1, st.complete);
+    TEST_ASSERT_EQUAL_INT(0, st.dropped);
+    TEST_ASSERT_EQUAL_UINT(674, r.parser.length()); // "Valid OBIS-ASCII telegram (674 bytes)"
+
+    Collector col;
+    Summary s = parseWith(dataOf(r.parser), col);
+    TEST_ASSERT_EQUAL_UINT16(26, s.lines); // "26 Zeilen, 24 Werte, 0 verworfen"
+    TEST_ASSERT_EQUAL_UINT16(24, s.entries);
+    TEST_ASSERT_EQUAL_UINT16(0, s.dropped);
+}
+
+static void test_field_telegram_only_current_1_8_0_counts()
+{
+    Collector col;
+    parseWith(fieldTelegram(), col);
+    int current = 0, history = 0;
+    double value = 0;
+    for (size_t i = 0; i < col.entries.size(); i++)
+    {
+        if (!col.hadEntry[i]) continue;
+        const Entry &e = col.entries[i];
+        if (e.c != 1 || e.d != 8 || e.e != 0) continue;
+        if (ObisAscii::isCurrentValue(e))
+        {
+            current++;
+            value = e.number;
+        }
+        else
+            history++;
+    }
+    TEST_ASSERT_EQUAL_INT(1, current);
+    TEST_ASSERT_EQUAL_INT(5, history);
+    assertNear(7003.0386, value);
+}
+
+static void test_current_value_rule()
+{
+    Entry e;
+    memset(&e, 0, sizeof(e));
+    e.f = 255;
+    TEST_ASSERT_TRUE(ObisAscii::isCurrentValue(e)); // *255 und Kurzform ohne F
+    e.f = 96;
+    TEST_ASSERT_FALSE(ObisAscii::isCurrentValue(e));
+    e.f = 0;
+    TEST_ASSERT_FALSE(ObisAscii::isCurrentValue(e));
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -199,5 +285,8 @@ int main(int, char **)
     RUN_TEST(test_only_blank_lines);
     RUN_TEST(test_last_line_without_eol);
     RUN_TEST(test_len_parameter_is_honoured);
+    RUN_TEST(test_field_telegram_frames_as_in_log);
+    RUN_TEST(test_field_telegram_only_current_1_8_0_counts);
+    RUN_TEST(test_current_value_rule);
     return UNITY_END();
 }

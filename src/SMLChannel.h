@@ -66,6 +66,7 @@ class SMLChannel : public OpenKNX::Channel
     uint16_t _asciiBadDrops = 0;           // verworfene Telegramme seit dem letzten gültigen
     uint32_t _asciiLastDump = 0;           // Zeitpunkt des letzten Debug-Dumps
     uint16_t _asciiSuppressedDumps = 0;    // seitdem unterdrückte Dumps
+    bool _intervalHintLogged = false;      // Hinweis "Timeout kürzer als Sendeabstand" nur einmal
 
     int64_t _sentCounterIn = 0;
     int64_t _sentCounterInT1 = 0;
@@ -151,6 +152,7 @@ class SMLChannel : public OpenKNX::Channel
     void writeBufferSml(uint8_t byte);
     void writeBufferAscii(uint8_t byte);
     void logAsciiDrop(const char *reason);
+    void noteValidTelegram();
     bool isAscii();
     void publishIdentifier(const char *obis, const char *identifier);
 

@@ -298,6 +298,11 @@ namespace ObisAscii
         return value;
     }
 
+    bool isCurrentValue(const Entry &entry)
+    {
+        return entry.f == 255;
+    }
+
     size_t trimMeterId(const char *in, size_t len, char *out, size_t outSize)
     {
         if (out == nullptr || outSize == 0)

@@ -106,10 +106,20 @@ bool SMLModule::processCommand(const std::string command, bool diagnose)
         uint8_t channel = atoi(command.substr(8, 2).c_str());
         if (channel >= 1 && channel <= SML_ChannelCount && _channels[channel - 1] != nullptr)
         {
+            // Das Diagnose-KO ist ein DPT 16 mit 14 Zeichen: dort nur der kurze Status. Auf der
+            // Konsole steht davor, mit welchem Protokoll und welcher Schnittstelle der Kanal läuft.
             if (diagnose)
+            {
                 openknx.console.writeDiagnoseKo("%s", _channels[channel - 1]->diagnoseInfo().c_str());
+            }
             else
-                logInfoP("%s", _channels[channel - 1]->diagnoseInfo().c_str());
+            {
+                const std::string serial = _channels[channel - 1]->serialInfo();
+                if (serial.empty())
+                    logInfoP("%s", _channels[channel - 1]->diagnoseInfo().c_str());
+                else
+                    logInfoP("%s %s", serial.c_str(), _channels[channel - 1]->diagnoseInfo().c_str());
+            }
             return true;
         }
     }

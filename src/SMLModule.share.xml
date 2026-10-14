@@ -28,6 +28,32 @@
               <ParameterType Id="%AID%_PT-SMLOnChange" Name="SMLOnChange">
                 <TypeNumber SizeInBit="16" Type="unsignedInt" minInclusive="1" maxInclusive="1000" />
               </ParameterType>
+              <ParameterType Id="%AID%_PT-SMLProtocol" Name="SMLProtocol">
+                <TypeRestriction Base="Value" SizeInBit="2">
+                  <Enumeration Text="SML" Value="0" Id="%ENID%" />
+                  <Enumeration Text="OBIS-ASCII (IEC 62056-21)" Value="1" Id="%ENID%" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="%AID%_PT-SMLBaudrate" Name="SMLBaudrate">
+                <TypeRestriction Base="Value" SizeInBit="3" UIHint="DropDown">
+                  <Enumeration Text="300 Baud" Value="1" Id="%ENID%" />
+                  <Enumeration Text="1200 Baud" Value="2" Id="%ENID%" />
+                  <Enumeration Text="2400 Baud" Value="3" Id="%ENID%" />
+                  <Enumeration Text="4800 Baud" Value="4" Id="%ENID%" />
+                  <Enumeration Text="9600 Baud" Value="0" Id="%ENID%" />
+                  <Enumeration Text="19200 Baud" Value="5" Id="%ENID%" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="%AID%_PT-SMLDataFormat" Name="SMLDataFormat">
+                <TypeRestriction Base="Value" SizeInBit="2" UIHint="DropDown">
+                  <Enumeration Text="Automatisch (SML: 8N1, OBIS-ASCII: 7E1)" Value="0" Id="%ENID%" />
+                  <Enumeration Text="8N1" Value="1" Id="%ENID%" />
+                  <Enumeration Text="7E1" Value="2" Id="%ENID%" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="%AID%_PT-SMLReceiveTimeout" Name="SMLReceiveTimeout">
+                <TypeNumber SizeInBit="8" Type="unsignedInt" minInclusive="1" maxInclusive="255" />
+              </ParameterType>
               <ParameterType Id="%AID%_PT-SLEDFunc" Name="SLEDFunc">
                 <TypeRestriction Base="Value" SizeInBit="16" UIHint="DropDown">
                   <Enumeration Text="SML Gesamtstatus" Value="200" Id="%ENID%" />

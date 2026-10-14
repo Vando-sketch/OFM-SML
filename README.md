@@ -1,6 +1,6 @@
 # OFM-SML
 
-Liest SML-Telegramme (Smart Message Language) von Stromzählern über einen Optokoppler bzw. eine serielle Schnittstelle und sendet die Zählerstände, Momentanwerte und optional das Statuswort auf den KNX-Bus.
+Liest SML-Telegramme (Smart Message Language) oder OBIS-ASCII-Telegramme (IEC 62056-21, Push-Betrieb) von Stromzählern über einen Optokoppler bzw. eine serielle Schnittstelle und sendet die Zählerstände, Momentanwerte und optional das Statuswort (nur SML) auf den KNX-Bus.
 
 ## Funktionsumfang
 
@@ -18,7 +18,7 @@ Ist im Netzwerkmodul MQTT aktiviert, veröffentlicht jeder Kanal zusätzlich pro
 
 ## Status-LEDs
 
-Modul und jeder Kanal können eine Status-LED anzeigen, nach dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": sie blinkt bei jedem empfangenen Byte unabhängig von dessen Gültigkeit, leuchtet dauerhaft bei einem gültigen Telegramm und erlischt bzw. wird rot, wenn längere Zeit kein gültiger Empfang mehr erfolgt.
+Modul und jeder Kanal können eine Status-LED anzeigen, nach dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": Farb-LEDs sind rot und blinken bei jedem empfangenen Byte, solange kein gültiges Telegramm erkannt wurde. Einfarbige LEDs bleiben bis zum ersten gültigen Telegramm aus, das Blinken taugt bei ihnen also nicht als Verdrahtungstest. Bei gültigem Empfang leuchtet die LED (grün) und flackert mit den empfangenen Daten. Kommt innerhalb des Empfangs-Timeouts kein gültiges Telegramm mehr, wird sie wieder rot bzw. erlischt. Nach dem Start wird die LED erst mit dem ersten vollständigen Telegramm grün. Ein Zähler, der nur alle paar Sekunden sendet, braucht dafür entsprechend lange, und ein Telegramm, dessen Anfang beim Einschalten verpasst wurde, zählt nicht. Etwas Geduld ist also normal. `sml debug` zeigt, wann das erste gültige Telegramm ankommt.
 
 ## Diagnose
 
@@ -35,4 +35,4 @@ So lässt sich schon vor dem Einschalten der einzelnen Funktionen live prüfen, 
 ## Konsolenbefehle
 
 - **sml debug** – schaltet eine fortlaufende Anzeige aller empfangenen SML-Daten ein bzw. aus
-- **sml infoXX** – zeigt denselben Status wie das Diagnose-KO direkt auf der Konsole
+- **sml infoXX** – zeigt denselben Status wie das Diagnose-KO direkt auf der Konsole, davor Protokoll, Baudrate und Datenformat (z. B. `ASCII 9600 7E1 1R T0 P`). Das Diagnose-KO selbst antwortet ohne diese Angaben, ein DPT-16-Text fasst nur 14 Zeichen

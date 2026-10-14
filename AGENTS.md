@@ -30,6 +30,17 @@ Die Kanalanzahl wird durch das OAM über `SML_ChannelCount` vorgegeben. Jeder Ka
 - `SMLChannel::processFile()` übergibt ein komplettes Telegramm an `libsml` und wertet die OBIS-Einträge über `processDataPoint()` aus.
 - Innerhalb eines Telegramms gewinnt für das Statuswort-KO der **erste** OBIS-Eintrag mit Statusfeld — die SML-Spec erlaubt grundsätzlich pro Eintrag ein eigenes, potenziell unterschiedliches Statusfeld.
 
+## OBIS-ASCII (IEC 62056-21)
+
+- Pro Kanal wählt der Parameter `c%C%Protocol` zwischen SML (0) und OBIS-ASCII (1). Eine automatische Erkennung, freie OBIS-Codes und Mode-C-Abfrage (`/?!`) sind bewusst nicht vorgesehen.
+- `ObisAsciiParser` (`src/ObisAsciiParser.h/.cpp`) ist frei von Arduino-Abhängigkeiten und wird auf dem Host getestet (`test/`). Er rahmt Telegramme byteweise (`/` … `!`, optional STX/ETX/BCC), blendet Bit 7 aus (7E1 als 8N1 gelesen) und zerlegt die Zeilen.
+- `writeBuffer()` verzweigt nach Protokoll; der SML-Teil steht unverändert in `writeBufferSml()`. Das fertige ASCII-Telegramm wird wie `_smlBuffer` per Mutex an `processFile()` übergeben.
+- Jeder ASCII-Wert endet im bestehenden `processDataPoint(obis, a, b, c, d, e, f, double, statusSuffix)`. Einheiten werden vorher normiert (kWh → Wh, kW → W), damit KOs, MQTT und `sml info` für beide Protokolle identisch arbeiten. Neue OBIS-Codes daher nur dort ergänzen, nicht im Parser.
+- Ein Steuerzeichen im laufenden Telegramm verwirft es sofort (`DropReason::Garbage`), damit falsche Baudrate/falsches Format nicht als Pufferüberlauf erscheinen. Diagnose (einmaliger Hinweis, Hex-Dump in `sml debug`) steht in `SMLChannel::writeBufferAscii()`/`logAsciiDrop()`.
+- Nur aktuelle Werte (Gruppe F = 255, `ObisAscii::isCurrentValue()`) gehen an `processDataPoint()`. Vorwerte wie `1.8.0*96` würden sonst den Zählerstand überschreiben, weil `processDataPoint()` F nicht auswertet.
+- Die Identifikationsnummer (96.1.0) wird um führende Nullen gekürzt, bis sie 14 Zeichen lang ist (DPT 16.001).
+- Parameterblock pro Kanal: 32 Byte. Offset 28–29 belegt (Protokoll, Baudrate, Datenformat, Empfangs-Timeout), Offset 30–31 reserviert.
+
 ## Zählertypen
 
 Typ 0 = Inaktiv. Typ 1–4 unterscheiden Einrichtungs-/Zweirichtungszähler jeweils mit oder ohne Tarif (HT/NT), siehe `PT-SMLType` in `SMLModule.templ.xml`.
@@ -50,12 +61,12 @@ Pro empfangenem Telegramm veröffentlicht jeder Kanal einen JSON-Snapshot mit al
 
 ## Status-LEDs
 
-Modul (`SML Gesamtstatus`, Funktions-ID 200) und jeder Kanal (`SML Kanalstatus X`, ID 201+n) folgen dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": die LED blinkt bei jedem empfangenen Byte unabhängig von dessen Gültigkeit, leuchtet dauerhaft bei einem gültigen Telegramm und erlischt bzw. wird rot, wenn `OPENKNX_SML_STALE_TIMEOUT` (Default 5000 ms) ohne gültigen Empfang verstreicht. Der Gesamtstatus des Moduls ist aktiv, sobald mindestens ein Kanal aktiv empfängt.
+Modul (`SML Gesamtstatus`, Funktions-ID 200) und jeder Kanal (`SML Kanalstatus X`, ID 201+n) folgen dem Zustandsmodell der OpenKNX-Wiki-Seite "Status-LED": Farb-LEDs blinken rot bei jedem empfangenen Byte, solange kein gültiges Telegramm erkannt wurde; einfarbige LEDs bleiben bis zum ersten gültigen Telegramm dunkel (`ledHelper()` in `SMLModule.cpp`). Bei gültigem Empfang leuchtet die LED, nach Ablauf des Empfangs-Timeouts (ETS-Parameter `c%C%ReceiveTimeout`, 1–255 s, Standard 15 s ≈ 3 × Sendeabstand, Begründung in der Applikationsbeschreibung) ohne gültigen Empfang wird sie rot bzw. erlischt. Dasselbe Timeout steuert das KO "Zähler empfängt". Der Gesamtstatus des Moduls ist aktiv, sobald mindestens ein Kanal aktiv empfängt.
 
 ## Konsolenbefehle
 
 - **sml debug** – schaltet ausführliches Logging aller OBIS-Werte und Rohtelegramme ein/aus.
-- **sml infoNN** – zeigt den erkannten Zählertyp (1R/2R, höchster Tarif, verfügbare Messgrößen P/V/A/F) für Kanal NN, auch über das Diagnose-KO abrufbar.
+- **sml infoNN** – zeigt den erkannten Zählertyp (1R/2R, höchster Tarif, verfügbare Messgrößen P/V/A/F) für Kanal NN, auch über das Diagnose-KO abrufbar. Nur die Konsole stellt Protokoll, Baudrate und Datenformat voran (`SMLChannel::serialInfo()`, z. B. `ASCII 9600 7E1 1R T0 P`). Das Diagnose-KO ist ein DPT 16: `writeDpt16Ko()` in OGM-Common ruft bei 15 und mehr Zeichen `fatalError()` auf, `diagnoseInfo()` muss deshalb bei höchstens 14 Zeichen bleiben.
 
 ## Regeln für Weiterentwicklung
 

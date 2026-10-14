@@ -1,5 +1,18 @@
 # Changes
 
+## 1.2.0
+
+- Neu: OBIS-ASCII nach IEC 62056-21 im Push-Betrieb (z. B. Logarex LK13BE). Pro Kanal einstellbar über die neuen Parameter Protokoll, Baudrate, Datenformat und Empfangs-Timeout. Die ASCII-Werte laufen durch dieselbe Auswertung wie SML, Kommunikationsobjekte, Sendeverhalten, MQTT und `sml info` sind daher identisch.
+- Neu: Kommunikationsobjekt "Zähler empfängt" (DPT 1.002) pro Kanal, sendet bei Änderung.
+- Neu: `sml info` zeigt auf der Konsole zusätzlich Protokoll, Baudrate und Datenformat, z. B. `ASCII 9600 7E1 1R T0 P`. Das Diagnose-KO antwortet unverändert kurz (DPT 16, 14 Zeichen).
+- Neu: `sml debug` gibt im ASCII-Betrieb jede Rohzeile, die Kennungszeile und die Zahl verworfener Zeilen aus. Im SML-Betrieb erscheint einmalig ein Hinweis, wenn die empfangenen Daten nach OBIS-ASCII aussehen.
+- Neu: Fehlersuche bei falscher Baudrate oder falschem Datenformat im ASCII-Betrieb. Ein Telegramm mit Steuerzeichen wird sofort verworfen statt erst nach `OPENKNX_SML_BUFFER` Bytes per Pufferüberlauf. Nach drei verworfenen Telegrammen meldet die Konsole einmalig "Daten kommen an, aber kein gültiges OBIS-ASCII-Telegramm" mit der aktuellen Einstellung. `sml debug` zeigt dazu Anfang und Ende der verworfenen Daten als Hex-/ASCII-Dump. Sendet der Zähler SML, erscheint einmalig "Zähler sendet SML, Protokoll in der ETS auf SML umstellen".
+- Fix (OBIS-ASCII): Vorwerte mit Gruppe F ≠ 255 (z. B. 1.8.0*96 … *100 beim Logarex mit "InF on") überschrieben den aktuellen Zählerstand 1.8.0*255. Ausgewertet wird jetzt nur noch der aktuelle Wert, Vorwerte erscheinen nur im Debug-Log.
+- Neu: Ist der Empfangs-Timeout kürzer als der gemessene Sendeabstand des Zählers, meldet die Konsole das einmalig. `sml debug` zeigt den Abstand zum vorigen Telegramm.
+- Geändert: Der Empfangs-Timeout für Status-LED und Statusauswertung ist jetzt pro Kanal einstellbar (bisher fest 5 Sekunden, jetzt standardmäßig 15 Sekunden: etwa das Dreifache des üblichen Sendeabstands von 1–4 Sekunden, damit einzelne verlorene Telegramme den Status nicht kippen).
+- Geändert: Kanäle ohne serielle Schnittstelle werten ihren Status trotzdem aus und melden beim Start einmalig einen Hinweis.
+- ⚠️ Der Parameterblock pro Kanal wächst von 28 auf 32 Byte und jeder Kanal bekommt ein weiteres Kommunikationsobjekt. Nach dem Update ist ein vollständiger Download in der ETS nötig.
+
 ## 1.1.0
 
 - Fix: Der Parameter "Zählerstände (Wh)" wurde nie ausgewertet (Offset-Makro
